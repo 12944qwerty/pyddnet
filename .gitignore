@@ -12,5 +12,7 @@ wheels/
 maps/*
 assets/*
 !.gitkeep
+!ddnet.png
+!game_06.png
 
 uv.lock
