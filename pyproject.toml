@@ -7,7 +7,6 @@ requires-python = ">=3.13"
 dependencies = [
     "arcade>=3.3.3",
     "numpy>=2.4.0",
-    "pillow>=11.3.0",
     "twmap>=0.6.6",
     # "twnet-parser",
 ]
