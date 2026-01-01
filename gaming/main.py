@@ -45,6 +45,8 @@ class GameWindow(arcade.Window):
         self._accumulated_time = 0.0
         
         self.ui = None
+        
+        self.zoom = 0.5
 
     def setup(self):
         self.map = MapLoader("maps/ctf7.map")
@@ -130,6 +132,7 @@ class GameWindow(arcade.Window):
         self.tees_sprites.update(dt)
 
         self.camera.position = self.tee_sprite.center_x, self.tee_sprite.center_y
+        self.camera.zoom += (self.zoom - self.camera.zoom) * 0.2
 
         self.coordinate_label.text = f"x: {self.tee.position.x / 32:.2f}  y: {self.tee.position.y / 32:.2f}"
         self.velocity_label.text = f"vx: {self.tee.velocity.x / 32:.2f}  vy: {self.tee.velocity.y / 32:.2f}"
@@ -154,7 +157,7 @@ class GameWindow(arcade.Window):
             self.tee.velocity = Vector2(0, 0)
             
         if key == arcade.key.F: 
-            self.camera.zoom = 0.5
+            self.zoom = 0.5
             
         if key == arcade.key.SPACE:
             self.tee.should_jump = False
@@ -162,7 +165,7 @@ class GameWindow(arcade.Window):
         self.pressed_keys.discard(key)
             
     def on_mouse_scroll(self, x, y, scroll_x, scroll_y):
-        self.camera.zoom = clamp(self.camera.zoom + scroll_y / 50, 0.1, 10)
+        self.zoom = clamp(self.zoom + scroll_y / 50, 0.1, 50)
 
 def main():
     window = GameWindow()

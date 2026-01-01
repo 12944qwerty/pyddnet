@@ -14,8 +14,8 @@ def velocity_ramp(value: float, start: float, range: float, curvature: float):
 class TeeSprite(arcade.Sprite):
     def __init__(self, tee: Tee):
         super().__init__(
-            arcade.make_soft_square_texture(
-                TILE_SIZE, arcade.color.ORANGE, 255, 255
+            arcade.make_soft_circle_texture(
+                72, arcade.color.ORANGE, 255, 255
             )
         )
         
