@@ -19,6 +19,14 @@ class TeeSprite(arcade.Sprite):
             )
         )
         
+        # self.atlas = arcade.load_texture("assets/game_06.png")
+        # self.region = arcade.Texture(
+        #     name="tee_region",
+        #     image=self.atlas.image.crop((64, 0, 96, 32))
+        # )
+        
+        # self.texture = self.region
+        
         self.tee = tee
         
     def update(self, delta_time: float):
