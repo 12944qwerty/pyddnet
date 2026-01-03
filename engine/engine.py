@@ -24,3 +24,5 @@ class DDNetPhysicsEngine:
             player.tick(dt, self.map)
             
             player.move(dt, self.map)
+            
+            player.post_tick(dt, self.map)

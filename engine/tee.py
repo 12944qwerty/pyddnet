@@ -115,18 +115,19 @@ class Tee:
         match self.hook_state:
             case HookState.IDLE | HookState.RETRACTED:
                 self.hookpos = self.position * 1
-            case HookState.RETRACT_START | HookState.RETRACT_MIDDLE:
-                self.hook_state += 1
+            case HookState.RETRACT_START:
+                self.hook_state = HookState.RETRACT_MIDDLE
+            case HookState.RETRACT_MIDDLE:
+                self.hook_state = HookState.RETRACT_END
             case HookState.RETRACT_END:
                 self.hook_state = HookState.RETRACTED
             case HookState.FLYING:
                 hookbase = self.position * 1
                 
-                if self.newhook:
-                    hookbase = self.hooktelebase
+                # if self.newhook:
+                #     hookbase = self.hooktelebase
                     
                 newpos = self.hookpos + self.hookdir * HOOK_FIRE_SPEED
-                
                 if hookbase.distance(newpos) > HOOK_LENGTH:
                     self.hook_state = HookState.RETRACT_START
                     newpos = hookbase + (newpos - hookbase).normal() * HOOK_LENGTH
@@ -203,6 +204,21 @@ class Tee:
         
         self.position = newpos
         
+    def post_tick(self, dt, map: MapLoader):
+        tile = map.get_tile(self.position.x, self.position.y, layer="Tele")
+        
+        if isinstance(tile, TeleTile):
+            if tile.is_teleporter():
+                dest = map.get_teleport_destination(tile)
+                if dest is not None:
+                    self.position = dest * 1
+                    if tile.is_red():
+                        self.velocity = Vector2(0, 0)
+                        # self.hooktelebase = self.position * 1
+                        # self.newhook = True
+                        
+                    
+        
     def _move_box(self, _pos: Vector2, _vel: Vector2, map: MapLoader):
         grounded = False
         
@@ -264,15 +280,21 @@ class Tee:
     def _check_point(self, x, y, map: MapLoader) -> bool:
         return map.get_tile(x, y).is_solid()
         
-    def _intersect_line_hook(self, pos0: Vector2, pos1: Vector2, map: MapLoader) -> tuple[bool, Vector2]:
-        dir = (pos1 - pos0).normal()
-        length = pos0.distance(pos1)
+    def _intersect_line_hook(self, pos0: Vector2, pos1: Vector2, map: MapLoader) -> tuple[int, Vector2]:
+        distance = pos0.distance(pos1)
+        end = int(distance + 1)
+        last = pos0 * 1
         
-        steps = int(length / 4) + 1
-        step_size = length / steps
-        
-        for step in range(steps + 1):
-            check_pos = pos0 + dir * step_size * step
-            if map.get_tile(check_pos.x, check_pos.y).is_solid():
-                return True, check_pos
-        return False, pos1
+        for i in range(end + 1):
+            t = i / end
+            check_pos = (pos0 * (1 - t)) + (pos1 * t)
+            tile = map.get_tile(check_pos.x, check_pos.y)
+            # print(check_pos, tile)
+            if tile.is_solid():
+                if tile.is_hookable():
+                    return 1, check_pos
+                else:
+                    return 2, last
+            last = check_pos * 1
+            
+        return 0, pos1

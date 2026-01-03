@@ -54,7 +54,7 @@ class GameWindow(arcade.Window):
         self.zoom = DEFAULT_ZOOM
 
     def setup(self):
-        self.map = MapLoader("maps/ctf7.map")
+        self.map = MapLoader("maps/Volleyball_v2.map")
         self.maprender = MapRenderer(
             self.map,
             "assets/ddnet.png"
