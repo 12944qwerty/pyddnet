@@ -7,6 +7,8 @@ class MapLoader:
     def __init__(self, map_path: str):
         self.map = Map(map_path)
         
+        print(self.map.info.settings)
+        
         self.tiles: dict[tuple, list[Tile]] = {}
         
         # Unhookable and Hookable collidables

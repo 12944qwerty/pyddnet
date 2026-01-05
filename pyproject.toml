@@ -7,9 +7,10 @@ requires-python = ">=3.13"
 dependencies = [
     "arcade>=3.3.3",
     "numpy>=2.4.0",
+    "pygame>=2.6.1",
     "twmap>=0.6.6",
-    # "twnet-parser",
+    "twnet-parser",
 ]
 
-# [tool.uv.sources]
-# twnet-parser = { path = "../twnet_parser", editable = true }
+[tool.uv.sources]
+twnet-parser = { git = "https://gitlab.com/teeworlds-network/twnet_parser.git", rev = "ad56c506af32802f343b58e60528819f7c64fc4b" }

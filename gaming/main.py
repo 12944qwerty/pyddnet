@@ -1,4 +1,6 @@
+import argparse
 import random
+from signal import signal, SIGINT
 import math
 import arcade
 from arcade.math import clamp
@@ -12,6 +14,8 @@ from gaming.tee import TeeSprite
 from gaming.renderer import MapRenderer
 from shared import Vector2
 
+from network.client import TeeworldsClient
+
 
 SCREEN_WIDTH = 1920
 SCREEN_HEIGHT = 1080
@@ -20,7 +24,7 @@ SCREEN_TITLE = "TWMap Arcade Renderer"
 DEFAULT_ZOOM = 0.65
 
 class GameWindow(arcade.Window):
-    def __init__(self):
+    def __init__(self, args):
         super().__init__(
             SCREEN_WIDTH,
             SCREEN_HEIGHT,
@@ -32,6 +36,9 @@ class GameWindow(arcade.Window):
         arcade.set_background_color(arcade.color.DARK_SLATE_GRAY)
 
         self.camera = arcade.Camera2D(zoom=DEFAULT_ZOOM)
+        self.gui_camera = arcade.Camera2D()  # Screen-space camera for UI/text
+        
+        self.net = TeeworldsClient(args.host, args.port)
 
         self.map = None
         self.maprender = None
@@ -42,6 +49,7 @@ class GameWindow(arcade.Window):
         self.tee = None
         self.tees = None
         
+        self.mtarget = (0, 0)
         self.target = Vector2(0, 0)
         self.physics_engine = None
         
@@ -72,59 +80,47 @@ class GameWindow(arcade.Window):
         
         self.physics_engine = DDNetPhysicsEngine(self.map, self.tees)
         
-        self.ui = UIManager()
-        
-        self.ui.enable()
-
-        self.coordinate_label = UILabel(
-            text="x: 0.00  y: 0.00",
+        # Text overlays (screen-space)
+        self.coordinate_text = arcade.Text(
+            "x: 0.00  y: 0.00",
+            x=self.width - 12,
+            y=12,
+            color=arcade.color.WHITE,
             font_size=14,
-            text_color=arcade.color.WHITE,
-        )
-        self.velocity_label = UILabel(
-            text="vx: 0.00  vy: 0.00",
-            font_size=14,
-            text_color=arcade.color.WHITE,
-        )
-        self.fps_label = UILabel(
-            text="FPS: 0",
-            font_size=14,
-            text_color=arcade.color.WHITE,
-        )
-        self.mtarget = (0, 0)
-        self.angle = 0.0
-        self.mtarget_label = UILabel(
-            text="mx: 0.00 my: 0.00, deg: 0.00",
-            font_size=14,
-            text_color=arcade.color.WHITE,
-        )
-        
-        self.anchor = UIAnchorLayout()
-        self.anchor.add(
-            self.coordinate_label,
+            font_name="Courier New",
             anchor_x="right",
             anchor_y="bottom",
         )
-        self.anchor.add(
-            self.velocity_label,
+        self.velocity_text = arcade.Text(
+            "vx: 0.00  vy: 0.00",
+            x=self.width - 12,
+            y=32,
+            color=arcade.color.WHITE,
+            font_size=14,
+            font_name="Courier New",
             anchor_x="right",
             anchor_y="bottom",
-            align_y=20,
         )
-        self.anchor.add(
-            self.mtarget_label,
+        self.mtarget_text = arcade.Text(
+            "mx: 0.00 my: 0.00, deg: 0.00",
+            x=self.width - 12,
+            y=52,
+            color=arcade.color.WHITE,
+            font_size=14,
+            font_name="Courier New",
             anchor_x="right",
             anchor_y="bottom",
-            align_y=40,
         )
-        self.anchor.add(
-            self.fps_label,
+        self.fps_text = arcade.Text(
+            "FPS: 0",
+            x=self.width - 12,
+            y=72,
+            color=arcade.color.WHITE,
+            font_size=14,
+            font_name="Courier New",
             anchor_x="right",
             anchor_y="bottom",
-            align_y=60,
         )
-        
-        self.ui.add(self.anchor)
         
         arcade.enable_timings()
 
@@ -134,8 +130,6 @@ class GameWindow(arcade.Window):
 
         self.maprender.draw()
         self.tees_sprites.draw()
-        
-        self.ui.draw()
         
         arcade.draw_line(
             self.tee_sprite.center_x,
@@ -155,7 +149,16 @@ class GameWindow(arcade.Window):
             2
         )
 
-    def on_update(self, dt):        
+        # Draw UI/text in screen space
+        self.gui_camera.use()
+        self.coordinate_text.draw()
+        self.velocity_text.draw()
+        self.mtarget_text.draw()
+        self.fps_text.draw()
+
+    def on_update(self, dt):
+        self.net.tick()
+        
         if arcade.key.A in self.pressed_keys and arcade.key.D in self.pressed_keys:
             self.tee.direction = 0
         elif arcade.key.A in self.pressed_keys:
@@ -168,7 +171,7 @@ class GameWindow(arcade.Window):
         self.target.x, self.target.y, mz = self.camera.unproject((self.mtarget[0], self.mtarget[1]))
         self.tee.target = Vector2(self.target.x / 2, -self.target.y / 2) - self.tee.position
         
-        self.mtarget_label.text = f"mx: {self.target.x / 64:.2f} my: {self.target.y / 64:.2f}, deg: {self.tee.angle:.2f}"
+        self.mtarget_text.text = f"mx: {self.target.x / 64:.2f} my: {self.target.y / 64:.2f}, deg: {self.tee.angle:.2f}"
         
         self.tee.should_hook = arcade.MOUSE_BUTTON_RIGHT in self.pressed_keys
         
@@ -179,10 +182,10 @@ class GameWindow(arcade.Window):
         self.camera.position = self.tee_sprite.center_x, self.tee_sprite.center_y
         self.camera.zoom += (self.zoom - self.camera.zoom) * 0.2
 
-        self.coordinate_label.text = f"x: {self.tee.position.x / 32:.2f}  y: {self.tee.position.y / 32:.2f}"
-        self.velocity_label.text = f"vx: {self.tee.velocity.x / 32:.2f}  vy: {self.tee.velocity.y / 32:.2f}"
+        self.coordinate_text.text = f"x: {self.tee.position.x / 32:.2f}  y: {self.tee.position.y / 32:.2f}"
+        self.velocity_text.text = f"vx: {self.tee.velocity.x / 32:.2f}  vy: {self.tee.velocity.y / 32:.2f}"
         
-        self.fps_label.text = f"FPS: {arcade.get_fps():.2f}"
+        self.fps_text.text = f"FPS: {arcade.get_fps():.2f}"
 
     def on_key_press(self, key, modifiers):
         if key == arcade.key.Q:
@@ -223,8 +226,25 @@ class GameWindow(arcade.Window):
         self.pressed_keys.discard(button)
 
 def main():
-    window = GameWindow()
+    parser = argparse.ArgumentParser(
+        prog='uv run python -m gaming.main',
+    )
+    parser.add_argument("host")
+    parser.add_argument("port", type=int)
+    args = parser.parse_args()
+    
+    window = GameWindow(args)
     window.setup()
+    
+    def handler(signal_received, _):
+        print(f"got signal: {signal_received}")
+        print('SIGINT or CTRL-C detected. Exiting gracefully')
+        window.net.disconnect()
+        
+        exit(0)
+
+    signal(SIGINT, handler)
+    
     arcade.run()
 
 if __name__ == "__main__":
