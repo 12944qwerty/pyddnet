@@ -12,6 +12,9 @@ class DDNetPhysicsEngine:
         self.players = players
         self.accumulated_time = 0.0
         
+    def add_tee(self, tee: Tee):
+        self.players.append(tee)
+        
     def update(self, dt):
         STEP_TIME = 1/50
         self.accumulated_time += dt

@@ -12,13 +12,13 @@ from engine.maploader import MapLoader
 from engine.tee import Tee
 from gaming.tee import TeeSprite
 from gaming.renderer import MapRenderer
-from shared import Vector2
+from shared import HookState, Vector2
 
 from network.client import TeeworldsClient
 
 
-SCREEN_WIDTH = 1920
-SCREEN_HEIGHT = 1080
+SCREEN_WIDTH = 1280
+SCREEN_HEIGHT = 720
 SCREEN_TITLE = "TWMap Arcade Renderer"
 
 DEFAULT_ZOOM = 0.65
@@ -29,7 +29,7 @@ class GameWindow(arcade.Window):
             SCREEN_WIDTH,
             SCREEN_HEIGHT,
             SCREEN_TITLE,
-            fullscreen=True,
+            resizable=True,
             draw_rate=1/100,
             update_rate=1/100
         )
@@ -43,11 +43,12 @@ class GameWindow(arcade.Window):
         self.map = None
         self.maprender = None
         
-        self.tee_sprite = None
-        self.tees_sprites = None
+        self.tee_sprite = None  # Self tee sprite
+        self.tees_sprites = None  # All tee sprites
         
-        self.tee = None
-        self.tees = None
+        self.tee = None  # Self tee (controllable)
+        self.tees = None  # All tees list
+        self.tees_dict: dict[int, Tee] = {}  # Map of client_id -> Tee object for network tees
         
         self.mtarget = (0, 0)
         self.target = Vector2(0, 0)
@@ -72,6 +73,7 @@ class GameWindow(arcade.Window):
         self.tee.position = random.choice(self.map.spawners).position * 32 + Vector2(16, 16)
         
         self.tees = [self.tee]
+        self.tees_dict[self.net.local_client_id] = self.tee
 
         self.tee_sprite = TeeSprite(self.tee)
         
@@ -130,24 +132,17 @@ class GameWindow(arcade.Window):
 
         self.maprender.draw()
         self.tees_sprites.draw()
-        
-        arcade.draw_line(
-            self.tee_sprite.center_x,
-            self.tee_sprite.center_y,
-            self.tee_sprite.center_x + self.tee.target_direction.x * HOOK_LENGTH * 2,
-            self.tee_sprite.center_y - self.tee.target_direction.y * HOOK_LENGTH * 2,
-            arcade.color.GREEN if arcade.MOUSE_BUTTON_RIGHT in self.pressed_keys else arcade.color.RED,
-            2
-        )
-        
-        arcade.draw_line(
-            self.tee_sprite.center_x,
-            self.tee_sprite.center_y,
-            self.tee.hookpos.x * 2,
-            -self.tee.hookpos.y * 2,
-            arcade.color.BLUE,
-            2
-        )
+            
+        for i, tee in self.tees_dict.items():
+            # print(i, tee.hook_state)
+            arcade.draw_line(
+                tee.position.x * 2,
+                tee.position.y * 2,
+                tee.hookpos.x * 2,
+                tee.hookpos.y * 2,
+                arcade.color.YELLOW,
+                3
+            )
 
         # Draw UI/text in screen space
         self.gui_camera.use()
@@ -158,6 +153,50 @@ class GameWindow(arcade.Window):
 
     def on_update(self, dt):
         self.net.tick()
+        
+        for client_id, net_char in self.net.characters.items():
+            if client_id == self.net.local_client_id:
+                continue  # Skip self for now, just displaying other tees rn
+            
+            if client_id not in self.tees_dict:
+                print("Created new tee for client", client_id, net_char.item_name)
+                new_tee = Tee()
+                new_tee.position = Vector2(net_char.x, net_char.y)
+                new_tee.velocity = Vector2(net_char.vel_x, net_char.vel_y)
+                new_tee.direction = net_char.direction
+                new_tee.jumped = net_char.jumped
+                new_tee.hook_state = HookState(net_char.hook_state)
+                new_tee.hooktick = net_char.hook_tick
+                new_tee.target = Vector2(net_char.hook_x, net_char.hook_y)
+
+                self.tees_dict[client_id] = new_tee
+                self.tees.append(new_tee)
+                
+                new_sprite = TeeSprite(new_tee)
+                self.tees_sprites.append(new_sprite)
+                
+                self.physics_engine.add_tee(new_tee)
+            else:
+                # print("Updated tee for client", client_id, net_char.item_name, net_char.x, net_char.y, HookState(net_char.hook_state).name)
+                tee = self.tees_dict[client_id]
+                tee.position = Vector2(net_char.x, net_char.y)
+                tee.velocity = Vector2(net_char.vel_x, net_char.vel_y)
+                tee.direction = net_char.direction
+                tee.jumped = net_char.jumped
+                tee.hook_state = HookState(net_char.hook_state)
+                tee.hooktick = net_char.hook_tick
+                tee.target = Vector2(net_char.hook_x, net_char.hook_y)
+
+        
+        # Remove tees for disconnected clients
+        # disconnected_ids = [cid for cid in self.tees_dict if cid not in self.net.characters and cid != self.net.local_client_id]
+        # for client_id in disconnected_ids:
+        #     tee_to_remove = self.tees_dict.pop(client_id)
+        #     self.tees.remove(tee_to_remove)
+        #     # Remove corresponding sprite (find and remove by tee reference)
+        #     self.tees_sprites = arcade.SpriteList()
+        #     for tee_obj in self.tees:
+        #         self.tees_sprites.append(TeeSprite(tee_obj))
         
         if arcade.key.A in self.pressed_keys and arcade.key.D in self.pressed_keys:
             self.tee.direction = 0
@@ -241,11 +280,15 @@ def main():
         print('SIGINT or CTRL-C detected. Exiting gracefully')
         window.net.disconnect()
         
+        arcade.exit()       
+        
         exit(0)
 
     signal(SIGINT, handler)
     
     arcade.run()
+    
+    window.net.disconnect()
 
 if __name__ == "__main__":
     main()

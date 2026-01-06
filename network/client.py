@@ -292,15 +292,15 @@ class TeeworldsClient():
                 self.snap_storage.current_recv_tick = msg.tick
 
         if (time.time() - self.last_send_time) > 1:
-            self.input.input = ObjPlayerInput()
+            # self.input.input = ObjPlayerInput()
             # generate some random inputs for testing
-            self.input.input_size = 40
-            self.input.input.direction = random.randint(-1, 1)
-            self.input.input.fire = random.randint(0, 100)
-            self.input.input.hook = random.randint(0, 1) == 0
-            self.input.input.jump = random.randint(0, 1) == 0
-            self.input.input.target_x = random.randint(-200, 200)
-            self.input.input.target_y = random.randint(-200, 200)
+            # self.input.input_size = 40
+            # self.input.input.direction = random.randint(-1, 1)
+            # self.input.input.fire = random.randint(0, 100)
+            # self.input.input.hook = random.randint(0, 1) == 0
+            # self.input.input.jump = random.randint(0, 1) == 0
+            # self.input.input.target_x = random.randint(-200, 200)
+            # self.input.input.target_y = random.randint(-200, 200)
             self.send_input()
 
     def center_around_tee(self, tee: ObjCharacter) -> pygame.Vector2:
